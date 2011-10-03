@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 # var to determine package source
 PKGSRC=cd
@@ -49,7 +49,7 @@ echo "sshd:	ALL" > /etc/hosts.allow
 echo "ALL:	ALL" > /etc/hosts.deny
 
 # make sure sshd starts
-sed -i 's:^DAEMONS\(.*\))$:DAEMONS\1 sshd):' /etc/rc.conf
+sed -i 's:^DAEMONS\(.*\))$:DAEMONS\1 sshd rc.vboxadd):' /etc/rc.conf
 
 # install mitchellh's ssh key
 mkdir /home/vagrant/.ssh
@@ -70,7 +70,7 @@ pacman-db-upgrade
 pacman -Syy
 
 # install some packages
-pacman -S --noconfirm glibc git pkg-config fakeroot
+pacman -S --noconfirm glibc git pkg-config fakeroot ruby
 gem install --no-ri --no-rdoc chef facter
 cd /tmp
 git clone https://github.com/puppetlabs/puppet.git
@@ -79,6 +79,27 @@ ruby install.rb --bindir=/usr/bin --sbindir=/sbin
 
 # set up networking
 [[ $PKGSRC == 'net' ]] && sed -i 's/^\(interface=*\)/\1eth0/' /etc/rc.conf
+
+# Install virtualbox guest additions from repo
+pacman -Syu virtualbox-archlinux-additions
+
+# Setup virtualbox modules in rc.conf
+sed -i 's:^MODULES\(.*\))$:MODULES\1 vboxguest vboxsf vboxvideo):' /etc/rc.conf
+
+# add to /etc/rc.conf
+
+# clean out pacman cache
+pacman -Scc<<EOF
+y
+y
+EOF
+
+# zero out the fs
+dd if=/dev/zero of=/tmp/clean || rm /tmp/clean
+>>>>>>> [archlinux-x86_64] fixes for use with dual arch iso, also fixing up vbox tools install
+
+# Upgrade to the latest!
+pacman -Syu --noconfirm
 
 # leave the chroot
 ENDCHROOT

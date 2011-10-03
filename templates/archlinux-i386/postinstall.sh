@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 
 date > /etc/vagrant_box_build_time
 
@@ -68,20 +68,18 @@ pacman-db-upgrade
 pacman -Syy
 
 # install some packages
-pacman -S --noconfirm glibc git
+pacman -S --noconfirm glibc git ruby
 gem install --no-ri --no-rdoc chef facter
 cd /tmp
 git clone https://github.com/puppetlabs/puppet.git
 cd puppet
 ruby install.rb --bindir=/usr/bin --sbindir=/sbin
 
-# install virtualbox guest additions
-cd /tmp
-wget http://download.virtualbox.org/virtualbox/"$VBOX_VERSION"/VBoxGuestAdditions_"$VBOX_VERSION".iso
-mount -o loop VBoxGuestAdditions_"$VBOX_VERSION".iso /mnt
-sh /mnt/VBoxLinuxAdditions.run
-umount /mnt
-rm VBoxGuestAdditions_"$VBOX_VERSION".iso
+# Install virtualbox guest additions from repo
+pacman -Syu virtualbox-archlinux-additions
+
+# Setup virtualbox modules in rc.conf
+sed -i 's:^MODULES\(.*\))$:MODULES\1 vboxguest vboxsf vboxvideo):' /etc/rc.conf
 
 # host-only networking
 cat <<EOF
@@ -99,6 +97,9 @@ EOF
 
 # zero out the fs
 dd if=/dev/zero of=/tmp/clean || rm /tmp/clean
+
+# Upgrade to the latest!
+pacman -Syu --noconfirm
 
 ENDCHROOT
 
