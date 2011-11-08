@@ -1,10 +1,10 @@
 Veewee::Session.declare({
-  :cpu_count => '1', :memory_size=> '256', 
-  :disk_size => '5000', :disk_format => 'VDI',:hostiocache => 'off',
-  :os_type_id => 'ArchLinux_64',
-  :iso_file => "archlinux-2010.05-core-dual.iso",
-  :iso_src => "http://archlinux.mirror.kangaroot.net/iso/2010.05/archlinux-2010.05-core-dual.iso",
-  :iso_md5 => "6b0fec50e4895eaecd58a6157d1b949a",
+  :cpu_count => '2', :memory_size=> '1024', 
+  :disk_size => '5070', :disk_format => 'VDI',:hostiocache => 'off',
+  :os_type_id => 'ArchLinux',
+  :iso_file => "archlinux-2011.08.19-core-dual.iso",
+  :iso_src => "http://mirrors.cat.pdx.edu/archlinux/iso/2011.08.19/archlinux-2011.08.19-core-dual.iso",
+  #:iso_md5 => "6b0fec50e4895eaecd58a6157d1b949a",
   :iso_download_timeout => "1000",
   :boot_wait => "5", :boot_cmd_sequence => [
     '<Down>',
@@ -26,5 +26,5 @@ Veewee::Session.declare({
   :ssh_host_port => "7222", :ssh_guest_port => "22",
   :sudo_cmd => "sh '%f'",
   :shutdown_cmd => "shutdown -h now",
-  :postinstall_files => [ "postinstall.sh", "postinstall2.sh"], :postinstall_timeout => "10000"
+  :postinstall_files => [ "postinstall.sh"], :postinstall_timeout => "50000"
 })

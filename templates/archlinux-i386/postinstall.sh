@@ -1,13 +1,17 @@
-#!/bin/bash -e
+#!/bin/bash -x
 
 date > /etc/vagrant_box_build_time
 
 # launch automated install
 su -c 'aif -p automatic -c aif.cfg'
 
+# choose the mirror we setup in aif
+cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+
 # copy over the vbox version file
+mkdir -p /mnt/root
 /bin/cp -f /root/.vbox_version /mnt/root/.vbox_version
-VBOX_VERSION=$(cat /root/.vbox_version)
+vbox_version=$(cat /root/.vbox_version)
 
 # chroot into the new system
 mount -o bind /dev /mnt/dev
@@ -56,9 +60,6 @@ wget --no-check-certificate 'https://raw.github.com/mitchellh/vagrant/master/key
 chmod 600 /home/vagrant/.ssh/authorized_keys
 chown -R vagrant /home/vagrant/.ssh
 
-# choose a mirror
-sed -i 's/^#\(.*leaseweb.*\)/\1/' /etc/pacman.d/mirrorlist
-
 # update pacman
 pacman -Syy
 pacman -S --noconfirm pacman
@@ -67,39 +68,43 @@ pacman -S --noconfirm pacman
 pacman-db-upgrade
 pacman -Syy
 
+pacman -S --noconfirm ruby git yajl
+
 # install some packages
-pacman -S --noconfirm glibc git ruby
-gem install --no-ri --no-rdoc chef facter
-cd /tmp
-git clone https://github.com/puppetlabs/puppet.git
-cd puppet
-ruby install.rb --bindir=/usr/bin --sbindir=/sbin
-
-# Install virtualbox guest additions from repo
-pacman -Syu virtualbox-archlinux-additions
-
-# Setup virtualbox modules in rc.conf
-sed -i 's:^MODULES\(.*\))$:MODULES\1 vboxguest vboxsf vboxvideo):' /etc/rc.conf
+gem install --no-ri --no-rdoc chef
+gem install --no-ri --no-rdoc puppet
 
 # host-only networking
-cat <<EOF
+cat >> /etc/rc.local <<EOF
 # enable DHCP at boot on eth0
 # See https://wiki.archlinux.org/index.php/Network#DHCP_fails_at_boot
-dhcpcd -k eth0
-dhcpcd -nd eth0
-EOF >> /etc/rc.local
+dhcpcd eth0
+EOF
+
+# install yaourt
+wget http://aur.archlinux.org/packages/pa/package-query/package-query.tar.gz
+tar -xzvf package-query.tar.gz
+cd package-query
+makepkg -s --asroot --install --noconfirm
+cd ..
+wget http://aur.archlinux.org/packages/ya/yaourt/yaourt.tar.gz
+tar -xzvf yaourt.tar.gz
+cd yaourt
+makepkg -s --asroot --install --noconfirm
+
+pacman -S --noconfirm virtualbox-archlinux-additions 
 
 # clean out pacman cache
-pacman -Scc<<EOF
-y
-y
-EOF
+#pacman -Scc<<EOF
+#y
+#y
+#EOF
+
+# Upgrade to the latest!
+#pacman -Syu --noconfirm
 
 # zero out the fs
 dd if=/dev/zero of=/tmp/clean || rm /tmp/clean
-
-# Upgrade to the latest!
-pacman -Syu --noconfirm
 
 ENDCHROOT
 

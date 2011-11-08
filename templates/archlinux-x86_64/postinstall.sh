@@ -1,15 +1,17 @@
-#!/bin/bash -e
-
-# var to determine package source
-PKGSRC=cd
+#!/bin/bash -x
 
 date > /etc/vagrant_box_build_time
 
 # launch automated install
 su -c 'aif -p automatic -c aif.cfg'
 
+# choose the mirror we setup in aif
+cp /etc/pacman.d/mirrorlist /mnt/etc/pacman.d/mirrorlist
+
 # copy over the vbox version file
+mkdir -p /mnt/root
 /bin/cp -f /root/.vbox_version /mnt/root/.vbox_version
+vbox_version=$(cat /root/.vbox_version)
 
 # chroot into the new system
 mount -o bind /dev /mnt/dev
@@ -49,7 +51,7 @@ echo "sshd:	ALL" > /etc/hosts.allow
 echo "ALL:	ALL" > /etc/hosts.deny
 
 # make sure sshd starts
-sed -i 's:^DAEMONS\(.*\))$:DAEMONS\1 sshd rc.vboxadd):' /etc/rc.conf
+sed -i 's:^DAEMONS\(.*\))$:DAEMONS\1 sshd):' /etc/rc.conf
 
 # install mitchellh's ssh key
 mkdir /home/vagrant/.ssh
@@ -58,35 +60,39 @@ wget --no-check-certificate 'https://raw.github.com/mitchellh/vagrant/master/key
 chmod 600 /home/vagrant/.ssh/authorized_keys
 chown -R vagrant /home/vagrant/.ssh
 
-# choose a mirror
-sed -i 's/^#\(.*leaseweb.*\)/\1/' /etc/pacman.d/mirrorlist
-
 # update pacman
-[[ $PKGSRC == 'cd' ]] && pacman -Syy
-[[ $PKGSRC == 'cd' ]] && pacman -S --noconfirm pacman
+pacman -Syy
+pacman -S --noconfirm pacman
 
 # upgrade pacman db
 pacman-db-upgrade
 pacman -Syy
 
+pacman -S --noconfirm ruby git yajl
+
 # install some packages
-pacman -S --noconfirm glibc git pkg-config fakeroot ruby
-gem install --no-ri --no-rdoc chef facter
-cd /tmp
-git clone https://github.com/puppetlabs/puppet.git
-cd puppet
-ruby install.rb --bindir=/usr/bin --sbindir=/sbin
+gem install --no-ri --no-rdoc chef
+gem install --no-ri --no-rdoc puppet
 
-# set up networking
-[[ $PKGSRC == 'net' ]] && sed -i 's/^\(interface=*\)/\1eth0/' /etc/rc.conf
+# host-only networking
+cat >> /etc/rc.local <<EOF
+# enable DHCP at boot on eth0
+# See https://wiki.archlinux.org/index.php/Network#DHCP_fails_at_boot
+dhcpcd eth0
+EOF
 
-# Install virtualbox guest additions from repo
-pacman -Syu virtualbox-archlinux-additions
+# install yaourt
+wget http://aur.archlinux.org/packages/pa/package-query/package-query.tar.gz
+tar -xzvf package-query.tar.gz
+cd package-query
+makepkg -s --asroot --install --noconfirm
+cd ..
+wget http://aur.archlinux.org/packages/ya/yaourt/yaourt.tar.gz
+tar -xzvf yaourt.tar.gz
+cd yaourt
+makepkg -s --asroot --install --noconfirm
 
-# Setup virtualbox modules in rc.conf
-sed -i 's:^MODULES\(.*\))$:MODULES\1 vboxguest vboxsf vboxvideo):' /etc/rc.conf
-
-# add to /etc/rc.conf
+pacman -S --noconfirm virtualbox-archlinux-additions 
 
 # clean out pacman cache
 pacman -Scc<<EOF
@@ -94,18 +100,13 @@ y
 y
 EOF
 
+# Upgrade to the latest!
+#pacman -Syu --noconfirm
+
 # zero out the fs
 dd if=/dev/zero of=/tmp/clean || rm /tmp/clean
->>>>>>> [archlinux-x86_64] fixes for use with dual arch iso, also fixing up vbox tools install
 
-# Upgrade to the latest!
-pacman -Syu --noconfirm
-
-# leave the chroot
 ENDCHROOT
 
-# take down network to prevent next postinstall.sh from starting too soon
-/etc/rc.d/network stop
-
-# and reboot!
-reboot
+# and halt for packaging!
+init 0
